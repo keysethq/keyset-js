@@ -3,6 +3,13 @@
 All notable changes to `@keyset/sdk` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the package follows [Semantic Versioning](https://semver.org/) from 1.0.0 (see [VERSIONING.md](./VERSIONING.md)).
 
+## [1.0.1] - 2026-11-18
+
+### Changed
+
+- Published through npm trusted publishing from [keysethq/keyset-js](https://github.com/keysethq/keyset-js), with
+  provenance and without a token. The code is the same as 1.0.0.
+
 ## [1.0.0] - 2026-11-18
 
 First public release. The API surface is the one 0.17.0 had, declared stable: from here on additive changes are minor

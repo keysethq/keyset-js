@@ -3,6 +3,7 @@
 # Never runs by itself: it is started by hand (workflow_dispatch) and then waits for the owner to approve the
 # `npm-publish` environment. There is no npm token in this repository or in its secrets. npm trusts this exact
 # workflow file through trusted publishing (OpenID Connect), and `--provenance` ties the tarball to this commit.
+# Every run only stages the version; it becomes public when the owner approves it on npmjs.com with 2FA.
 #
 # It refuses to publish when the package is still `"private": true` or when that version already exists on npm.
 name: publish
@@ -97,7 +98,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_FIRST_PUBLISH_TOKEN }}
         run: npm stage publish . --provenance --access public
 
-      - name: Publish with provenance (trusted publishing)
+      # Every later version: trusted publishing, no token. npm's trusted publishers default to "stage only" (since
+      # 3 Sep 2026), and staging also works where direct publishing is allowed, so this run stages as well and the
+      # owner approves the version on npmjs.com › Staged Packages with 2FA.
+      - name: Stage with provenance (trusted publishing; the owner approves on npmjs.com)
         if: env.HAS_FIRST_PUBLISH_TOKEN != 'true'
         working-directory: packages/${{ inputs.package }}
-        run: npm publish --provenance --access public
+        run: npm stage publish . --provenance --access public

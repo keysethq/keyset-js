@@ -14,14 +14,14 @@
     },
     "packages/cli": {
       "name": "@keyset/cli",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "bin": {
         "keyset": "./dist/main.js",
       },
     },
     "packages/sdk": {
       "name": "@keyset/sdk",
-      "version": "1.0.0",
+      "version": "1.0.1",
     },
   },
   "packages": {

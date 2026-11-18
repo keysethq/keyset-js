@@ -3,6 +3,14 @@
 All notable changes to `@keyset/cli` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 The CLI is versioned 0.x: a minor release may change a command; see "Stability" in the README.
 
+## [0.2.1] - 2026-11-18
+
+### Changed
+
+- Published through npm trusted publishing from [keysethq/keyset-js](https://github.com/keysethq/keyset-js), with
+  provenance and without a token. The code is the same as 0.2.0. `keyset login` against `https://api.keyset.cloud`
+  pairs since the same day; that was a server setting, not a CLI change.
+
 ## [0.2.0] - 2026-11-18
 
 First public candidate.
