@@ -5,7 +5,7 @@
 //   node scripts/pack-sdk.mjs                 verify into a fresh temporary directory
 //   node scripts/pack-sdk.mjs <emptyDir>      verify into a directory you name
 //   node scripts/pack-sdk.mjs --quiet <dir>   same, without the tool chatter
-//   node scripts/pack-sdk.mjs --release       same, expecting the package to be public (the mirror's publish workflow)
+//   node scripts/pack-sdk.mjs --release       same (accepted for the mirror's publish workflow)
 //
 // What "verified" means here, in order:
 //
@@ -31,9 +31,8 @@ import { join, resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const args = process.argv.slice(2).filter((argument) => argument !== '--quiet' && argument !== '--release')
 const quiet = process.argv.includes('--quiet')
-// `--release` is what the mirror's publish workflow passes, after the owner removed `private`: the guard then flips
-// from "must still be private" to "must not be private", so a candidate and a release are each checked for what they are.
-const release = process.argv.includes('--release')
+// `--release` is still accepted (the mirror's publish workflow passes it). Since the owner released the package on
+// 18 Nov 2026, every check, candidate or release, requires the packed manifest to be publishable.
 const stdio = quiet ? 'ignore' : 'inherit'
 const destination = args[0] ? resolve(args[0]) : await mkdtemp(join(tmpdir(), 'keyset-sdk-consumer-'))
 if (destination === root || destination.startsWith(`${root}/`))
@@ -240,12 +239,7 @@ const installed = JSON.parse(await readFile(join(destination, 'node_modules/@key
 const installedText = JSON.stringify(installed)
 expect(!installedText.includes('workspace:'), 'the installed manifest still carries a workspace specifier')
 expect(!installedText.includes('./src/'), 'the installed manifest still points at source')
-expect(
-  release ? installed.private !== true : installed.private === true,
-  release
-    ? 'the packed manifest is still private, so npm would refuse to publish it'
-    : 'the packed manifest is no longer private; publication is an owner decision',
-)
+expect(installed.private !== true, 'the packed manifest is still private, so npm would refuse to publish it')
 expect(
   Object.keys(installed.dependencies ?? {}).length === 0,
   `the SDK gained runtime dependencies: ${Object.keys(installed.dependencies ?? {}).join(', ')}`,

@@ -1,7 +1,6 @@
 {
   "name": "@keyset/cli",
   "version": "0.2.0",
-  "private": true,
   "description": "The keyset command line: sign in from the browser, forward events to a local endpoint, create test events.",
   "license": "MIT",
   "homepage": "https://keyset.dev/cli/",

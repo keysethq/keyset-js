@@ -41,7 +41,8 @@ export type PairingCollected =
 
 export interface KeysetEvent {
   readonly id: string
-  readonly type: EventType
+  /** A newer server sends types this CLI does not name; `listen` forwards them all the same. */
+  readonly type: string
   readonly createdAt: string
   readonly data: Readonly<Record<string, unknown>>
 }
@@ -52,6 +53,7 @@ interface EventPage {
 }
 
 const EVENT_ID = /^evt_[a-f0-9]{32}$/
+const EVENT_TYPE = /^[a-z][a-z_]*(\.[a-z][a-z_]*)+$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -68,7 +70,7 @@ function instant(value: unknown): string | null {
 function parseEvent(value: unknown): KeysetEvent | null {
   const event = record(value)
   if (!event) return null
-  const type = eventType(event['type'])
+  const type = typeof event['type'] === 'string' && EVENT_TYPE.test(event['type']) ? event['type'] : null
   const createdAt = instant(event['createdAt'])
   const data = record(event['data'])
   const id = event['id']

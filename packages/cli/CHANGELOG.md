@@ -3,7 +3,7 @@
 All notable changes to `@keyset/cli` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 The CLI is versioned 0.x: a minor release may change a command; see "Stability" in the README.
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-11-18
 
 First public candidate.
 
@@ -12,6 +12,11 @@ First public candidate.
 - MIT licence, `CHANGELOG.md` and a README that starts from `npm install -g @keyset/cli`.
 - A pack check in the Keyset repository that installs the packed CLI into a project outside the repository and runs
   `keyset --help`.
+
+### Changed
+
+- `keyset listen` accepts event types newer than the CLI and forwards them unchanged; `trigger` and
+  `--events` still name the eight types the CLI knows.
 
 ### Changed
 

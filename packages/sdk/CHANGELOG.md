@@ -3,7 +3,7 @@
 All notable changes to `@keyset/sdk` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the package follows [Semantic Versioning](https://semver.org/) from 1.0.0 (see [VERSIONING.md](./VERSIONING.md)).
 
-## [1.0.0] - unreleased
+## [1.0.0] - 2026-11-18
 
 First public release. The API surface is the one 0.17.0 had, declared stable: from here on additive changes are minor
 releases and a breaking change needs a major release after a stated deprecation period.

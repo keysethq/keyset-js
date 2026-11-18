@@ -1,7 +1,6 @@
 {
   "name": "@keyset/sdk",
   "version": "1.0.0",
-  "private": true,
   "description": "Official TypeScript SDK for the Keyset direct-booking API.",
   "license": "MIT",
   "homepage": "https://keyset.dev",

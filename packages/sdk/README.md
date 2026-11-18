@@ -366,7 +366,7 @@ unknown Reservations share `404`. Revoked/expired/wrong-environment credentials 
 
 The new cancellation operations add `refresh_cancellation_preview` to the recovery union and four typed problem
 codes (`VERSION_CONFLICT`, `PREVIEW_STALE`, `POLICY_MISSING`, `NOT_CANCELLABLE`). Consumers with exhaustive TypeScript
-switches must handle these variants when upgrading this unpublished SDK. Existing guest relay calls, authentication,
+switches must handle these variants when upgrading from a pre-1.0 build (never published). Existing guest relay calls, authentication,
 wire payloads and runtime recovery behavior are unchanged.
 
 ### Events (0.3)
@@ -395,7 +395,7 @@ for (;;) {
 
 0.3 also adds the price line kind `guest_surcharge` (a host's surcharge for further persons) and the optional
 `childAges` of a party. A new response enumeration member is a breaking change for an installed client, hence the
-minor version step of this unpublished SDK.
+minor version step of the pre-1.0 SDK, which was never published.
 
 ### Direct from the browser with a publishable key (0.4)
 
