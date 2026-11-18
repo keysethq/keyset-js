@@ -1,0 +1,10 @@
+[install]
+linker = "isolated"
+exact = true
+
+[install.lockfile]
+save = true
+
+[test]
+# Builds emit compiled copies of the unit tests into dist/; only the sources are tests.
+pathIgnorePatterns = ["**/node_modules/**", "**/dist/**"]

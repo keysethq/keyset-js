@@ -1,0 +1,105 @@
+# Publishes one package to npm, with provenance, from this repository only.
+#
+# Never runs by itself: it is started by hand (workflow_dispatch) and then waits for the owner to approve the
+# `npm-publish` environment. There is no npm token in this repository or in its secrets. npm trusts this exact
+# workflow file through trusted publishing (OpenID Connect), and `--provenance` ties the tarball to this commit.
+#
+# It refuses to publish when the package is still `"private": true` or when that version already exists on npm.
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Which package to publish
+        required: true
+        type: choice
+        options:
+          - sdk
+          - cli
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Required reviewers on this environment are the owner's approval.
+    environment: npm-publish
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      PACKAGE: ${{ inputs.package }}
+      HAS_FIRST_PUBLISH_TOKEN: ${{ secrets.NPM_FIRST_PUBLISH_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - name: Require npm 11.5.1 or newer
+        run: |
+          current="$(npm --version)"
+          if [ "$(printf '%s\n' 11.5.1 "$current" | sort -V | head -n1)" != "11.5.1" ]; then
+            npm install --global npm@^11.5.1
+          fi
+          npm --version
+
+      - name: Read the package
+        id: package
+        run: |
+          case "$PACKAGE" in
+            sdk|cli) ;;
+            *) echo "::error::package must be sdk or cli"; exit 1 ;;
+          esac
+          node -e '
+            const m = JSON.parse(require("node:fs").readFileSync(`packages/${process.env.PACKAGE}/package.json`, "utf8"));
+            const out = [`name=${m.name}`, `version=${m.version}`, `private=${m.private === true}`].join("\n");
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, out + "\n");
+          '
+
+      - name: Refuse a private package
+        if: steps.package.outputs.private == 'true'
+        run: |
+          echo "::error::${{ steps.package.outputs.name }} is still private. Removing \"private\": true is the owner's release step."
+          exit 1
+
+      - name: Refuse a version that already exists
+        run: |
+          name="${{ steps.package.outputs.name }}"
+          version="${{ steps.package.outputs.version }}"
+          if found="$(npm view "$name@$version" version 2>/dev/null)" && [ -n "$found" ]; then
+            echo "::error::$name@$version is already on npm. Bump the version."
+            exit 1
+          fi
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run typecheck
+      - run: bun run test
+      - name: Pack check, expecting a public package
+        run: node "scripts/pack-${PACKAGE}.mjs" --release
+
+      # The very first version of a package name cannot use trusted publishing yet: npm attaches a trusted publisher
+      # to an existing package. For that one run the owner stores a short-lived granular token as the environment
+      # secret NPM_FIRST_PUBLISH_TOKEN and deletes it right after; provenance still comes from this run's OIDC
+      # identity. Every later run has no such secret and authenticates through trusted publishing alone.
+      - name: Publish with provenance (first version, short-lived token)
+        if: env.HAS_FIRST_PUBLISH_TOKEN == 'true'
+        working-directory: packages/${{ inputs.package }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_FIRST_PUBLISH_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: Publish with provenance (trusted publishing)
+        if: env.HAS_FIRST_PUBLISH_TOKEN != 'true'
+        working-directory: packages/${{ inputs.package }}
+        run: npm publish --provenance --access public

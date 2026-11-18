@@ -1,0 +1,41 @@
+{
+  "name": "@keyset/cli",
+  "version": "0.2.0",
+  "private": true,
+  "description": "The keyset command line: sign in from the browser, forward events to a local endpoint, create test events.",
+  "license": "MIT",
+  "homepage": "https://keyset.dev/cli/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keysethq/keyset-js.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/keysethq/keyset-js/issues"
+  },
+  "keywords": [
+    "keyset",
+    "booking",
+    "accommodation",
+    "webhooks",
+    "cli"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "keyset": "./dist/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "bun test ./src"
+  }
+}
