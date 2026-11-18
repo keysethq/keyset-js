@@ -44,13 +44,10 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      # Trusted publishing needs npm 11.5.1 or newer.
-      - name: Require npm 11.5.1 or newer
+      # Trusted publishing needs npm 11.5.1 or newer, `npm stage publish` (the first version) a current npm 11.
+      - name: Use npm 11.21.2
         run: |
-          current="$(npm --version)"
-          if [ "$(printf '%s\n' 11.5.1 "$current" | sort -V | head -n1)" != "11.5.1" ]; then
-            npm install --global npm@^11.5.1
-          fi
+          npm install --global npm@11.21.2
           npm --version
 
       - name: Read the package
@@ -89,15 +86,16 @@ jobs:
         run: node "scripts/pack-${PACKAGE}.mjs" --release
 
       # The very first version of a package name cannot use trusted publishing yet: npm attaches a trusted publisher
-      # to an existing package. For that one run the owner stores a short-lived granular token as the environment
-      # secret NPM_FIRST_PUBLISH_TOKEN and deletes it right after; provenance still comes from this run's OIDC
-      # identity. Every later run has no such secret and authenticates through trusted publishing alone.
-      - name: Publish with provenance (first version, short-lived token)
+      # to an existing package. For that one run the owner stores a short-lived granular token (without the 2FA bypass)
+      # as the environment secret NPM_FIRST_PUBLISH_TOKEN. The run only stages the version (`npm stage publish` needs
+      # no one-time password); it becomes public when the owner approves it on npmjs.com with 2FA. Provenance comes
+      # from this run's OIDC identity. The owner then adds the trusted publisher and deletes the token and secret.
+      - name: Stage with provenance (first version, short-lived token; the owner approves on npmjs.com)
         if: env.HAS_FIRST_PUBLISH_TOKEN == 'true'
         working-directory: packages/${{ inputs.package }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_FIRST_PUBLISH_TOKEN }}
-        run: npm publish --provenance --access public
+        run: npm stage publish . --provenance --access public
 
       - name: Publish with provenance (trusted publishing)
         if: env.HAS_FIRST_PUBLISH_TOKEN != 'true'
