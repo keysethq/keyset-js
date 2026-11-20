@@ -21,7 +21,7 @@
     },
     "packages/sdk": {
       "name": "@keyset/sdk",
-      "version": "1.0.1",
+      "version": "1.2.0",
     },
   },
   "packages": {

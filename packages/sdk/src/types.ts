@@ -145,6 +145,21 @@ export type LegalDocument =
   | { readonly kind: 'link'; readonly url: string }
   | { readonly kind: 'text'; readonly text: string }
 
+/**
+ * 1.1.0: one step of tiered cancellation terms. Cancelled at least `hoursBeforeArrival` hours before the arrival time
+ * on the arrival day, `refundBasisPoints` / 100 percent of the booking is refunded. Tiers are listed first tier first;
+ * hours and shares fall from tier to tier.
+ */
+export interface RefundTier {
+  readonly hoursBeforeArrival: number
+  readonly refundBasisPoints: number
+}
+
+/** 1.1.0: a tier of terms bound to a stay; `until` is its deadline, property-local `YYYY-MM-DDTHH:MM`, inclusive. */
+export interface BoundRefundTier extends RefundTier {
+  readonly until: string
+}
+
 export interface Legal {
   readonly imprint: LegalDocument | null
   readonly privacy: LegalDocument | null
@@ -156,6 +171,14 @@ export interface Legal {
     readonly version: number
     readonly freeCancellationDays: number
     readonly lateRefundBasisPoints: number
+    /**
+     * 1.1.0: present for tiered terms only, and then the terms: the first tier whose deadline has not passed applies,
+     * after the last one `lateRefundBasisPoints`. `freeCancellationDays` is then only a cautious summary (the fewest
+     * whole days before arrival on which a cancellation at any hour still refunds everything; `0` when no tier does).
+     */
+    readonly refundTiers?: readonly RefundTier[]
+    /** 1.1.0: with `refundTiers`, the property-local arrival time `HH:MM` the hours count back from. */
+    readonly arrivalTime?: string
     readonly testOnly: boolean
   } | null
 }
@@ -218,6 +241,14 @@ export interface BookingProperty {
    * guest's details. Absent when the property takes bookings online.
    */
   readonly onlineBooking?: false
+  /**
+   * 1.2.0: whether the property takes new bookings now. `closed` while the host keeps it „not bookable yet“: the page,
+   * its units, prices and availability read as usual, `onlineBooking` is `false`, and `createQuote` and `startCheckout`
+   * answer `BOOKING_NOT_AVAILABLE` with the same status. With `opensOn` it takes bookings from that local date (in
+   * `timezone`) by itself — say so („Buchbar ab März 2027“), hide the booking form or point to the host's contact.
+   * Absent from servers that predate it; treat that as `open`.
+   */
+  readonly bookingStatus?: BookingStatus
   /** 0.5.0: `true` when the host keeps this page out of search engines; mark your page `noindex` then. */
   readonly noIndex?: true
   /**
@@ -232,6 +263,12 @@ export interface BookingProperty {
   readonly ratePlans?: readonly RatePlan[]
   readonly units: readonly BookingUnit[]
 }
+
+/**
+ * 1.2.0: whether a property takes new bookings. `opensOn` is a local date, `YYYY-MM-DD` in the property's timezone,
+ * from which a closed property takes bookings by itself; `null` while the host has named no date.
+ */
+export type BookingStatus = { readonly state: 'open' } | { readonly state: 'closed'; readonly opensOn: string | null }
 
 /** 0.8.0: a rate besides the standard one. */
 export interface RatePlan {
@@ -357,6 +394,10 @@ export interface Quote {
     readonly freeUntil: string | null
     readonly freeCancellationDays?: number | null
     readonly lateRefundBasisPoints?: number
+    /** 1.1.0: the bound tiers of tiered terms, each with its deadline; absent for a day rule. See `Legal`. */
+    readonly refundTiers?: readonly BoundRefundTier[]
+    /** 1.1.0: with `refundTiers`, the property-local arrival time `HH:MM`. */
+    readonly arrivalTime?: string
   }
   /** 0.8.0: the rate this quote was priced at; absent for the standard rate. */
   readonly ratePlan?: { readonly ratePlan: string; readonly name: string }
@@ -539,6 +580,10 @@ export interface CheckoutStatus {
     readonly freeUntil: string | null
     readonly freeCancellationDays: number | null
     readonly lateRefundBasisPoints: number
+    /** 1.1.0: the bound tiers of tiered terms, each with its deadline; absent for a day rule. See `Legal`. */
+    readonly refundTiers?: readonly BoundRefundTier[]
+    /** 1.1.0: with `refundTiers`, the property-local arrival time `HH:MM`. */
+    readonly arrivalTime?: string
   }
   /** 0.10.0: present when the host took a deposit — what was paid at booking; `total` stays the whole booking. */
   readonly deposit?: Money
@@ -656,4 +701,10 @@ export interface BookingProblem {
    * whether it never existed, was ended, is not valid today or is malformed. Absent from servers that predate it.
    */
   readonly discountCode?: 'not_valid'
+  /**
+   * 1.2.0: with `BOOKING_NOT_AVAILABLE` (status 409) on `createQuote` and `startCheckout` when the host has closed the
+   * property to new bookings — always `state: 'closed'`, with the date it opens if the host named one. Repeating the
+   * call does not help before then. Absent from servers that predate it.
+   */
+  readonly bookingStatus?: BookingStatus
 }

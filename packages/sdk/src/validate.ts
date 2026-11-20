@@ -22,8 +22,10 @@ import type {
   AvailabilityRequest,
   BookingErrorCode,
   BookingProblem,
+  BookingStatus,
   BookingProperty,
   BookingUnit,
+  BoundRefundTier,
   Checkout,
   CheckoutRequest,
   CheckoutStatus,
@@ -39,6 +41,7 @@ import type {
   Quote,
   QuoteRequest,
   Refund,
+  RefundTier,
   Stay,
   UnitPresentation,
 } from './types.js'
@@ -366,6 +369,55 @@ function legalDocument(value: unknown, path: string): LegalDocument | null {
   return { kind, text: text(at(source, 'text'), `${path}.text`, 1, 30_000) }
 }
 
+/** 1.1.0, read tolerantly: tier fields exist only on tiered terms and on servers that know them. */
+function refundTiers(value: unknown, path: string, bound: true): readonly BoundRefundTier[] | undefined
+function refundTiers(value: unknown, path: string, bound: false): readonly RefundTier[] | undefined
+function refundTiers(value: unknown, path: string, bound: boolean): readonly RefundTier[] | undefined {
+  if (value === undefined) return undefined
+  const tiers = list(value, path, 5)
+  if (tiers.length < 1) fail(path, 'must hold at least one tier')
+  return tiers.map((entry, index) => {
+    const tier = record(entry, `${path}[${index}]`)
+    const base: RefundTier = {
+      hoursBeforeArrival: integer(at(tier, 'hoursBeforeArrival'), `${path}[${index}].hoursBeforeArrival`, 0, 8736),
+      refundBasisPoints: integer(at(tier, 'refundBasisPoints'), `${path}[${index}].refundBasisPoints`, 0, 10_000),
+    }
+    if (!bound) return base
+    return {
+      ...base,
+      until: matches(
+        at(tier, 'until'),
+        `${path}[${index}].until`,
+        /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/,
+        'must be a local date and time YYYY-MM-DDTHH:MM',
+      ),
+    }
+  })
+}
+
+function arrivalTimeOf(terms: object, path: string): { readonly arrivalTime?: string } {
+  const arrival = at(terms, 'arrivalTime')
+  return arrival === undefined
+    ? {}
+    : { arrivalTime: matches(arrival, `${path}.arrivalTime`, LOCAL_TIME, 'must be a time HH:MM') }
+}
+
+function tierFields(
+  terms: object,
+  path: string,
+): { readonly refundTiers?: readonly RefundTier[]; readonly arrivalTime?: string } {
+  const tiers = refundTiers(at(terms, 'refundTiers'), `${path}.refundTiers`, false)
+  return { ...(tiers === undefined ? {} : { refundTiers: tiers }), ...arrivalTimeOf(terms, path) }
+}
+
+function boundTierFields(
+  terms: object,
+  path: string,
+): { readonly refundTiers?: readonly BoundRefundTier[]; readonly arrivalTime?: string } {
+  const tiers = refundTiers(at(terms, 'refundTiers'), `${path}.refundTiers`, true)
+  return { ...(tiers === undefined ? {} : { refundTiers: tiers }), ...arrivalTimeOf(terms, path) }
+}
+
 function legal(value: unknown, path: string): Legal {
   const source = record(value, path)
   const cancellation = at(source, 'cancellation')
@@ -390,6 +442,7 @@ function legal(value: unknown, path: string): Legal {
               0,
               10_000,
             ),
+            ...tierFields(terms, `${path}.cancellation`),
             testOnly: boolean(at(terms, 'testOnly'), `${path}.cancellation.testOnly`),
           },
   }
@@ -408,6 +461,7 @@ export function parseBookingProperty(value: unknown): BookingProperty {
   const noIndex = at(source, 'noIndex')
   const discountCodes = at(source, 'discountCodes')
   const onlineBooking = at(source, 'onlineBooking')
+  const status = at(source, 'bookingStatus')
   const ratePlans = at(source, 'ratePlans')
   const localTime = (time: unknown, path: string) =>
     time === null ? null : matches(time, path, LOCAL_TIME, 'must be a local time in HH:MM form')
@@ -475,6 +529,8 @@ export function parseBookingProperty(value: unknown): BookingProperty {
     ...(testMode === undefined ? {} : { testMode: literalTrue(testMode, 'testMode') }),
     // 0.16.0: the host's payments are not set up, so no checkout can start.
     ...(onlineBooking === undefined ? {} : { onlineBooking: literalFalse(onlineBooking, 'onlineBooking') }),
+    // 1.2.0: whether the property takes new bookings now; strict, like every enumeration the SDK acts on.
+    ...(status === undefined ? {} : { bookingStatus: bookingStatus(status, 'bookingStatus') }),
     // 0.5.0: the host keeps the page out of search engines.
     ...(noIndex === undefined ? {} : { noIndex: literalTrue(noIndex, 'noIndex') }),
     ...(discountCodes === undefined ? {} : { discountCodes: literalTrue(discountCodes, 'discountCodes') }),
@@ -637,6 +693,7 @@ export function parseQuote(value: unknown): Quote {
             ...(lateShare === undefined
               ? {}
               : { lateRefundBasisPoints: integer(lateShare, 'cancellation.lateRefundBasisPoints', 0, 10_000) }),
+            ...(terms === undefined ? {} : boundTierFields(terms, 'cancellation')),
           },
         }),
     ...(ratePlan === undefined
@@ -896,6 +953,7 @@ export function parseCheckoutStatus(value: unknown): CheckoutStatus {
               0,
               10_000,
             ),
+            ...boundTierFields(terms, 'cancellation'),
           },
         }),
     ...(deposit === undefined ? {} : { deposit: money(deposit, 'deposit') }),
@@ -978,9 +1036,29 @@ export function readProblem(value: unknown): BookingProblem | undefined {
       ...unavailableOf(at(source, 'unavailable')),
       // 0.17.0: a code that does not count; anything else there is ignored, never fatal.
       ...(at(source, 'discountCode') === 'not_valid' ? { discountCode: 'not_valid' as const } : {}),
+      ...bookingStatusOf(at(source, 'bookingStatus')),
     }
   } catch {
     return undefined
+  }
+}
+
+/** 1.2.0: whether a property takes new bookings. */
+function bookingStatus(value: unknown, path: string): BookingStatus {
+  const source = record(value, path)
+  const state = member(at(source, 'state'), `${path}.state`, ['open', 'closed'] as const)
+  if (state === 'open') return { state }
+  const opensOn = at(source, 'opensOn')
+  return { state, opensOn: opensOn === null ? null : calendarDay(opensOn, `${path}.opensOn`) }
+}
+
+/** The booking status of a refusal, or nothing: an unreadable one never makes the problem itself unreadable. */
+function bookingStatusOf(value: unknown): Pick<BookingProblem, 'bookingStatus'> {
+  if (value === undefined) return {}
+  try {
+    return { bookingStatus: bookingStatus(value, 'bookingStatus') }
+  } catch {
+    return {}
   }
 }
 

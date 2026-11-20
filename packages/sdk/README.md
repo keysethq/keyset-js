@@ -471,6 +471,15 @@ is what a quote with that rate would carry if made now, so choosing it still mea
 Nothing is held at those amounts, and they are never computed in the browser. Absent from servers before 0.15 and when
 only the standard rate is offered.
 
+### Tiered cancellation terms (1.1)
+
+A host may stage the refund by hours before arrival. Then `property().legal.cancellation`, a quote's `cancellation`
+and `checkoutStatus().cancellation` also carry `refundTiers` (first tier first; `hoursBeforeArrival`,
+`refundBasisPoints`, and on a quote or booking `until`, the property-local deadline `YYYY-MM-DDTHH:MM`, inclusive)
+and `arrivalTime` (`HH:MM`). The first tier whose deadline has not passed applies; after the last one
+`lateRefundBasisPoints` does. When `refundTiers` is present it is the terms, and `freeCancellationDays` is only a
+cautious summary for older readers. For a day rule these fields are absent and nothing changes.
+
 ### Deposits (0.10)
 
 A host may take a deposit. Then a quote's `dueNow` is the deposit, not the `total`, and `balance` names the rest and
@@ -539,6 +548,28 @@ so offer the field once, not on every keystroke. You never send an amount.
 quotes read as usual, but `startCheckout` answers `SERVICE_UNAVAILABLE` and nothing is held. Show the stay and the
 host's contact from `property().host` instead of asking for the guest's name and e-mail. The field is absent when the
 property takes bookings online, and from an API before it.
+
+### Bookable from a date (1.2)
+
+A host can keep the property visible but closed to new bookings, for example before it opens. `property().bookingStatus`
+is `{ state: 'open' }`, or `{ state: 'closed', opensOn }` with `opensOn` the local date (`YYYY-MM-DD` in
+`property().timezone`) from which it takes bookings by itself, or `null` while the host has named none. Units, prices and
+availability read as usual; `onlineBooking` is `false`. Decide yourself what the page shows:
+
+```ts
+const status = property.bookingStatus ?? { state: 'open' }
+if (status.state === 'closed') {
+  const from = status.opensOn
+    ? new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+        new Date(`${status.opensOn}T00:00:00Z`),
+      )
+    : null
+  showNotice(from ? `Buchbar ab ${from}` : 'Noch nicht buchbar') // and hide the booking form or link the host
+}
+```
+
+A client that ignores the status is refused all the same: `createQuote` and `startCheckout` answer
+`BOOKING_NOT_AVAILABLE` (status 409) with the same `bookingStatus` on the problem.
 
 ### One apartment, its size and the guest's own page (0.12)
 

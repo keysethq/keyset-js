@@ -3,6 +3,47 @@
 All notable changes to `@keyset/sdk` are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the package follows [Semantic Versioning](https://semver.org/) from 1.0.0 (see [VERSIONING.md](./VERSIONING.md)).
 
+## [1.2.0] - 2026-11-20
+
+### Added
+
+- A property can be visible but not bookable yet. `property()` carries `bookingStatus`: `{ state: 'open' }`, or
+  `{ state: 'closed', opensOn }` while the host has closed it to new bookings, with `opensOn` the local date
+  (`YYYY-MM-DD` in the property's `timezone`) from which it takes bookings by itself, or `null` until the host opens
+  it. Everything else on the property reads as before, so a website can keep showing the units, prices and
+  availability and decide itself whether to show „Buchbar ab März 2027“, hide its booking form or point to the host.
+  New type `BookingStatus`.
+- While the property is closed, `createQuote` and `startCheckout` answer `BOOKING_NOT_AVAILABLE` with status 409 and
+  the same `bookingStatus` on the problem, also for a client that never reads the property's status.
+
+### Migration
+
+- Nothing breaks. `bookingStatus` is optional; a server from before it sends none, which means `open`.
+- An installed 1.0.x, and every 0.x from before it, reads the refusal as the `BOOKING_NOT_AVAILABLE` it already knows,
+  and from 0.16 on also sees `onlineBooking: false` on a closed property, so it shows the stay without a booking form.
+
+## [1.1.0] - 2026-11-20
+
+### Added
+
+- Tiered cancellation terms. A host can now stage the refund by hours before arrival (for example 100 % until 7 days
+  before, 50 % until 48 hours before, then 0 %). New types `RefundTier` and `BoundRefundTier`, and optional
+  `refundTiers` and `arrivalTime` on `property().legal.cancellation`, on the quote's `cancellation` and on
+  `checkoutStatus().cancellation`. They are present only for tiered terms; for a day rule every answer is unchanged.
+  `refundTiers` is listed first tier first; on a quote or booking each tier also carries `until`, its property-local
+  deadline (`YYYY-MM-DDTHH:MM`, inclusive). The first tier whose deadline has not passed applies; after the last one
+  `lateRefundBasisPoints`. `arrivalTime` (`HH:MM`, property-local) is the clock the hours count back from.
+
+### Migration
+
+- Nothing breaks: code that reads only `freeCancellationDays`, `lateRefundBasisPoints` and `freeUntil` keeps working
+  against a server with tiers, and an installed 1.0.x reads tiered terms (it ignores the new keys).
+- To show tiered terms, read `refundTiers` when it is present and treat it as the terms. Then `freeCancellationDays`
+  is only a cautious summary for readers that predate tiers: the fewest whole days before arrival on which a
+  cancellation at any hour still refunds everything (`0` on `legal.cancellation` when no tier refunds everything,
+  `null` on a quote or booking). Do not compute a deadline from it; use each tier's `until` on a quote or booking.
+- `refundTiers` and `arrivalTime` are validated strictly when present and are absent from servers that predate them.
+
 ## [1.0.1] - 2026-11-18
 
 ### Changed
